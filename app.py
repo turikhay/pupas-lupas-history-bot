@@ -53,7 +53,8 @@ async def main():
         test_chamber = await bot.get_entity(tg.PeerChat(int(test_chamber_id)))
     channel: tg.Channel = await user.get_entity(channel_id) # type: ignore
     while len(years_set) > 0:
-        target_date = years_ago(choice(list(years_set)), today_at(tz))
+        target_year = choice(list(years_set))
+        target_date = years_ago(target_year, today_at(tz))
         logging.info(f"Selected date: {target_date}")
         collected = list(await collect_messages_at_date(channel, target_date))
         if len(collected) == 0:
@@ -68,6 +69,7 @@ async def main():
             group = choice(collected)
         if group == None:
             logging.info(f"Skipping date because it's fully reposted: {target_date}")
+            years_set.remove(target_year)
             continue
         logging.info(f"Selected group: {group}")
         await repost(channel.id, group, test_chamber)
