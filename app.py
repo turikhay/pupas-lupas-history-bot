@@ -41,7 +41,7 @@ bot = TelegramClient(
     bot_token=config["TELEGRAM_BOT_TOKEN"] # type: ignore
 )
 
-test_chamber_id = config["TELEGRAM_TEST_CHAMBER_ID"]
+test_chamber_id = config["TELEGRAM_TEST_CHAMBER_ID"] if "TELEGRAM_TEST_CHAMBER_ID" in config else None
 channel_id: int = int(config["TELEGRAM_CHANNEL_ID"]) # type: ignore
 search_date_start = datetime.datetime.strptime(config["TELEGRAM_SEARCH_DATE_START"], '%Y-%m-%d') # type: ignore
 
