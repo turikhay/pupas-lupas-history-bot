@@ -1,0 +1,11 @@
+services:
+  bot:
+    build:
+      context: .
+    volumes:
+      - ./storage:/app/storage
+    # environment:
+    #   - TELEGRAM_API_ID=${TELEGRAM_API_ID}
+    #   - TELEGRAM_API_HASH=${TELEGRAM_API_HASH}
+    #   - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+    #   - TELEGRAM_TEST_CHAMBER_ID=${TELEGRAM_TEST_CHAMBER_ID}
