@@ -44,6 +44,7 @@ bot = TelegramClient(
 test_chamber_id = config["TELEGRAM_TEST_CHAMBER_ID"] if "TELEGRAM_TEST_CHAMBER_ID" in config else None
 channel_id: int = int(config["TELEGRAM_CHANNEL_ID"]) # type: ignore
 search_date_start = datetime.datetime.strptime(config["TELEGRAM_SEARCH_DATE_START"], '%Y-%m-%d') # type: ignore
+ignored_author = config["TELEGRAM_IGNORE_AUTHOR"] # type: ignore
 
 async def main():
     years_max = (datetime.datetime.now(tz) - search_date_start.replace(tzinfo=tz)).days // 365
@@ -116,6 +117,9 @@ async def collect_messages_at_date(channel: tg.Channel, target_date: datetime.da
         assert isinstance(post, tg.Message)
         assert isinstance(post.date, datetime.datetime)
         group_id = post.grouped_id if post.grouped_id != None else post.id
+        if post.post_author == ignored_author:
+            logging.info(f"Skipping because it's from an ignored author")
+            continue
         if post.media == None:
             logging.info(f"Skipping because it doesn't contain media")
             continue
