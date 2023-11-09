@@ -2,7 +2,7 @@ from collections import OrderedDict
 import logging
 import datetime
 from sys import stdout
-from dotenv import load_dotenv
+from dotenv import dotenv_values
 from os import environ, path
 from zoneinfo import ZoneInfo
 from random import choice
@@ -13,16 +13,20 @@ from memery.json_memery import JsonMemory
 from message import GroupedMessages
 from supported_media import is_supported_media
 
-load_dotenv()
+config = {
+    **dotenv_values(".env.defaults"),
+    **dotenv_values(".env"), 
+    **environ,
+}
 logging.basicConfig(stream=stdout, level=logging.INFO)
 
-api_id: int = int(environ.get("TELEGRAM_API_ID")) # type: ignore
-api_hash: str = environ.get("TELEGRAM_API_HASH") # type: ignore
-tz: datetime.timezone = ZoneInfo(environ.get("TELEGRAM_SEARCH_TIMEZONE")) # type: ignore
-session_dir: str = environ.get("TELEGRAM_SESSION_DIR") # type: ignore
+api_id: int = int(config["TELEGRAM_API_ID"]) # type: ignore
+api_hash: str = config["TELEGRAM_API_HASH"] # type: ignore
+tz: datetime.timezone = ZoneInfo(config["TELEGRAM_SEARCH_TIMEZONE"]) # type: ignore
+session_dir: str = config["TELEGRAM_SESSION_DIR"] # type: ignore
 
 memery = JsonMemory(
-    environ.get("TELEGRAM_MEMERY_FILE") # type: ignore
+    config["TELEGRAM_MEMERY_FILE"] # type: ignore
 )
 user = TelegramClient(
     session=path.join(session_dir, "user"),
@@ -34,12 +38,12 @@ bot = TelegramClient(
     api_id=api_id,
     api_hash=api_hash
 ).start(
-    bot_token=environ.get("TELEGRAM_BOT_TOKEN") # type: ignore
+    bot_token=config["TELEGRAM_BOT_TOKEN"] # type: ignore
 )
 
-test_chamber_id = environ.get("TELEGRAM_TEST_CHAMBER_ID")
-channel_id: int = int(environ.get("TELEGRAM_CHANNEL_ID")) # type: ignore
-search_date_start = datetime.datetime.strptime(environ.get("TELEGRAM_SEARCH_DATE_START"), '%Y-%m-%d') # type: ignore
+test_chamber_id = config["TELEGRAM_TEST_CHAMBER_ID"]
+channel_id: int = int(config["TELEGRAM_CHANNEL_ID"]) # type: ignore
+search_date_start = datetime.datetime.strptime(config["TELEGRAM_SEARCH_DATE_START"], '%Y-%m-%d') # type: ignore
 
 async def main():
     years_max = (datetime.datetime.now(tz) - search_date_start.replace(tzinfo=tz)).days // 365
