@@ -60,6 +60,7 @@ async def main():
         collected = list(await collect_messages_at_date(channel, target_date))
         if len(collected) == 0:
             logging.info(f"Skipping date: {target_date}")
+            years_set.remove(target_year)
             continue
         group: GroupedMessages | None = choice(collected)
         while memery.is_posted_already(group.id):
