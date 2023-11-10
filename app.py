@@ -117,35 +117,39 @@ async def collect_messages_at_date(channel: tg.Channel, target_date: datetime.da
         print(f"Found post: {post.id}")
         assert isinstance(post, tg.Message)
         assert isinstance(post.date, datetime.datetime)
-        group_id = post.grouped_id if post.grouped_id != None else post.id
-        if post.post_author == ignored_author:
-            logging.info(f"Skipping because it's from an ignored author")
-            continue
-        if post.media == None:
-            logging.info(f"Skipping because it doesn't contain media")
-            continue
-        if not is_supported_media(post.media):
-            logging.info(f"Skipping because media is not supported: {post.media.to_dict()}")
-            continue
-        if isinstance(post.media, tg.MessageMediaDocument) and isinstance(post.media.document, tg.Document) and post.media.document.mime_type == "image/webp":
-            logging.info(f"Skipping because it's a sticker")
-            continue
         if post.date < target_time:
             logging.info(f"Skipping because it's before the target date {post.date} > {target_time}")
             continue
-        if post.reply_to != None:
-            logging.info(f"Ignoring reply_to post ({post.id})")
-            continue
-        # TODO check if posted by the bot
         if post.date >= next_time:
             logging.info(f"Found next date, stopping: {post.date} > {next_time}")
             break
+        if not can_be_reposted(post):
+            continue
+        group_id = post.grouped_id if post.grouped_id != None else post.id
         if group_id not in posts:
             posts[group_id] = GroupedMessages(group_id, post.id, post.date)
         posts[group_id].messages.append(post)
     if len(posts) == 0:
         logging.warning(f"No posts found at the target date: {target_date}")
     return list(posts.values())
+
+def can_be_reposted(post: tg.Message) -> bool:
+    if post.post_author == ignored_author:
+        logging.info(f"Skipping because it's from an ignored author")
+        return False
+    if post.media == None:
+        logging.info(f"Skipping because it doesn't contain media")
+        return False
+    if not is_supported_media(post.media):
+        logging.info(f"Skipping because media is not supported: {post.media.to_dict()}")
+        return False
+    if isinstance(post.media, tg.MessageMediaDocument) and isinstance(post.media.document, tg.Document) and post.media.document.mime_type == "image/webp":
+        logging.info(f"Skipping because it's a sticker")
+        return False
+    if post.reply_to != None:
+        logging.info(f"Ignoring reply_to post ({post.id})")
+        return False
+    return True
 
 # The first parameter is the .session file name (absolute paths allowed)
 with user:
