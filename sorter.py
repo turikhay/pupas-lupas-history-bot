@@ -1,8 +1,9 @@
 from telethon import types as tg
+from random import random
 
 from message import GroupedMessages
 
-__evaluated_entry = tuple[GroupedMessages, int]
+__evaluated_entry = tuple[GroupedMessages, float]
 
 negative_emoticons = ('👎', '💩', '🥱')
 
@@ -11,12 +12,13 @@ def sort_by_best(messages: list[GroupedMessages]) -> list[GroupedMessages] | Non
     evaluatable = False
     evaluated: list[__evaluated_entry] = list()
     for group in messages:
-        score = __score_group(group)
+        score: float = __score_group(group)
         if score != 0:
             evaluatable = True
         if score < 0:
             # skip bad posts
             continue
+        score += random() / 2. # randomize messages inside their tier
         evaluated.append((group, score))
     if not evaluatable:
         # all scores are 0, nothing to sort by
