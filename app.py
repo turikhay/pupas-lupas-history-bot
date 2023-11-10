@@ -5,12 +5,13 @@ from sys import stdout
 from dotenv import dotenv_values
 from os import environ, path
 from zoneinfo import ZoneInfo
-from random import choice
+from random import choice, shuffle
 from telethon import TelegramClient, types as tg, hints
 
 from dateutils import today_at, years_ago, to_datetime
 from memery.json_memery import JsonMemory
 from message import GroupedMessages
+from sorter import sort_by_best
 from supported_media import is_supported_media
 
 config = {
@@ -62,20 +63,28 @@ async def main():
             logging.info(f"Skipping date: {target_date}")
             years_set.remove(target_year)
             continue
-        group: GroupedMessages | None = choice(collected)
-        while memery.is_posted_already(group.id):
-            collected.remove(group)
-            if len(collected) == 0:
-                group = None
-                break
-            group = choice(collected)
-        if group == None:
-            logging.info(f"Skipping date because it's fully reposted: {target_date}")
+        sorted = sort_by_best(collected)
+        if sorted != None:
+            logging.info("Sorted by best")
+            collected = sorted
+        else:
+            logging.info("Random sorted")
+            collected = list(collected)
+            shuffle(collected)
+        nothing_to_post = True
+        for group in collected:
+            if memery.is_posted_already(group.id):
+                logging.info(f"Already posted: {group.id}")
+                continue
+            logging.info(f"Posting: {group}")
+            await repost(channel.id, group, test_chamber)
+            memery.store(group.id)
+            nothing_to_post = False
+            break
+        if nothing_to_post:
+            logging.info(f"Nothing post from the selected date: {target_date}")
             years_set.remove(target_year)
             continue
-        logging.info(f"Selected group: {group}")
-        await repost(channel.id, group, test_chamber)
-        memery.store(group.id)
         return
     logging.error("Couldn't find anything to post. Please check settings")
 
