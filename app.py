@@ -125,10 +125,10 @@ async def collect_messages_at_date(channel: tg.Channel, target_date: datetime.da
             break
         if not can_be_reposted(post):
             continue
-        group_id = post.grouped_id if post.grouped_id != None else post.id
-        if group_id not in posts:
-            posts[group_id] = GroupedMessages(group_id, post.id, post.date)
-        posts[group_id].messages.append(post)
+        virtual_id = post.grouped_id if post.grouped_id != None else post.id
+        if virtual_id not in posts:
+            posts[virtual_id] = GroupedMessages(virtual_id, post.id, post.date)
+        posts[virtual_id].messages.append(post)
     if len(posts) == 0:
         logging.warning(f"No posts found at the target date: {target_date}")
     return list(posts.values())
