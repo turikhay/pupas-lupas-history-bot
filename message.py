@@ -4,7 +4,7 @@ from telethon import types as tg
 class GroupedMessages():
     def __init__(self, id: int, msg_id: int, date: datetime) -> None:
         self.id = id
-        self.msg_id = id
+        self.msg_id = msg_id
         self.date = date
         self.messages: list[tg.Message] = list()
 
