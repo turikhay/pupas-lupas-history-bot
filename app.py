@@ -56,12 +56,12 @@ async def main():
     channel: tg.Channel = await user.get_entity(channel_id) # type: ignore
     while len(years_set) > 0:
         target_year = choice(list(years_set))
+        years_set.remove(target_year)
         target_date = years_ago(target_year, today_at(tz))
         logging.info(f"Selected date: {target_date}")
         collected = list(await collect_messages_at_date(channel, target_date))
         if len(collected) == 0:
             logging.info(f"Skipping date: {target_date}")
-            years_set.remove(target_year)
             continue
         sorted = sort_by_best(collected)
         if sorted != None:
@@ -83,7 +83,6 @@ async def main():
             break
         if nothing_to_post:
             logging.info(f"Nothing post from the selected date: {target_date}")
-            years_set.remove(target_year)
             continue
         return
     logging.error("Couldn't find anything to post. Please check settings")
