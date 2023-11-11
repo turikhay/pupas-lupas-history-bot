@@ -5,7 +5,7 @@ from message import GroupedMessages
 
 __evaluated_entry = tuple[GroupedMessages, float]
 
-negative_emoticons = ('👎', '💩', '🥱')
+negative_emoticons = ('👎', '💩', '🥱', '🤔')
 
 def sort_by_best(messages: list[GroupedMessages]) -> list[GroupedMessages] | None:
     assert len(messages) > 0
