@@ -88,22 +88,15 @@ async def main():
     logging.error("Couldn't find anything to post. Please check settings")
 
 async def repost(channel_id: int, group: GroupedMessages, target: hints.EntityLike | None = None) -> None:
-    channel = await bot.get_entity(tg.PeerChannel(channel_id))
-    posts = group.messages
-    # TODO: use references, do not download
-    match len(posts):
-        case 0:
-            raise Exception("No messages in the group")
-        case 1:
-            artifact = await user.download_media(posts[0], file="/tmp/")
-        case _:
-            artifact = []
-            for post in posts:
-                artifact.append(await user.download_media(post, file="/tmp/"))
+    channel: tg.Channel = await bot.get_entity(tg.PeerChannel(channel_id)) # type: ignore
+    assert len(group.messages) > 0
+    artifacts = []
+    for post in group.messages:
+        artifacts.append(await user.download_media(post, file="/tmp/"))
     await bot.send_message(
         target if target != None else channel,
-        message=f"[{group.date.year}](https://t.me/{channel.username}/{group.msg_id}) #MemeThrowback", # type: ignore
-        file=artifact, # type: ignore
+        message=f"[{group.date.year}](https://t.me/{channel.username}/{group.msg_id}) #MemeThrowback",
+        file=artifacts,
         silent=True,
     )
     pass
