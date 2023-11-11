@@ -9,7 +9,7 @@ from random import choice, shuffle
 from telethon import TelegramClient, types as tg, hints
 
 from dateutils import today_at, years_ago, to_datetime
-from memery.json_memery import JsonMemory
+from memery.json_memery import JsonMemery
 from message import GroupedMessages
 from sorter import sort_by_best
 from supported_media import is_supported_media
@@ -26,7 +26,7 @@ api_hash: str = config["TELEGRAM_API_HASH"] # type: ignore
 tz: datetime.timezone = ZoneInfo(config["TELEGRAM_SEARCH_TIMEZONE"]) # type: ignore
 session_dir: str = config["TELEGRAM_SESSION_DIR"] # type: ignore
 
-memery = JsonMemory(
+memery = JsonMemery(
     config["TELEGRAM_MEMERY_FILE"] # type: ignore
 )
 user = TelegramClient(

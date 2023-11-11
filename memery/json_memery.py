@@ -1,7 +1,7 @@
 import json
 from .memery import Memery
 
-class JsonMemory(Memery):
+class JsonMemery(Memery):
     def __init__(self, path: str):
         self.path = path
 
