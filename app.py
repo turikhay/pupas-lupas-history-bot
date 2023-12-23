@@ -150,6 +150,19 @@ def can_be_reposted(post: tg.Message) -> bool:
     if post.reply_to != None:
         logging.info(f"Ignoring reply_to post ({post.id})")
         return False
+    if post.message:
+        is_wednesday = datetime.datetime.now(tz=tz).date().weekday() == 2
+        if not is_wednesday:
+            msgl = post.message.lower()
+            mentions_wednesday = any(
+                frag in msgl for frag in (
+                    "wednesday",
+                    "сред", # сред(-а,-ы,-у,...)
+                )
+            )
+            if mentions_wednesday:
+                logging.info(f"It's not Wednesday, but the post mentions it 😡")
+                return False
     return True
 
 # The first parameter is the .session file name (absolute paths allowed)
