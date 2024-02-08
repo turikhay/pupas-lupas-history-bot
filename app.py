@@ -116,7 +116,9 @@ async def collect_messages_at_date(channel: tg.Channel, target_date: datetime.da
     next_time = target_time + datetime.timedelta(1)
     async for post in user.iter_messages(channel, reverse=True, offset_id=first_post.id, limit=100):
         print(f"Found post: {post.id}")
-        assert isinstance(post, tg.Message)
+        if not isinstance(post, tg.Message):
+            print(f"Skipping because it's not a message ({type(post)})")
+            continue
         assert isinstance(post.date, datetime.datetime)
         if post.date < target_time:
             logging.info(f"Skipping because it's before the target date {post.date} > {target_time}")
