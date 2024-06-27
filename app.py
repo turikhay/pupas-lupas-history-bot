@@ -97,6 +97,7 @@ async def repost(channel_id: int, group: GroupedMessages, target: hints.EntityLi
         target if target != None else channel,
         message=f"[{group.date.year}](https://t.me/{channel.username}/{group.msg_id}) #MemeThrowback",
         file=artifacts,
+        reply_to=group.reply_to, # type: ignore
         silent=True,
     )
     pass
@@ -133,7 +134,9 @@ async def collect_messages_at_date(channel: tg.Channel, target_date: datetime.da
             posts[virtual_id] = GroupedMessages(
                 virtual_id,
                 post.id,
-                post.date.astimezone(tz)
+                post.date.astimezone(tz),
+                post.reply_to.reply_to_msg_id \
+                    if isinstance(post.reply_to, tg.MessageReplyHeader) else None,
             )
         posts[virtual_id].messages.append(post)
     if len(posts) == 0:
@@ -152,9 +155,6 @@ def can_be_reposted(post: tg.Message) -> bool:
         return False
     if isinstance(post.media, tg.MessageMediaDocument) and isinstance(post.media.document, tg.Document) and post.media.document.mime_type == "image/webp":
         logging.info(f"Skipping because it's a sticker")
-        return False
-    if post.reply_to != None:
-        logging.info(f"Ignoring reply_to post ({post.id})")
         return False
     if post.message:
         is_wednesday = datetime.datetime.now(tz=tz).date().weekday() == 2

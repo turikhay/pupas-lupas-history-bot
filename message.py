@@ -2,10 +2,11 @@ from datetime import datetime
 from telethon import types as tg
 
 class GroupedMessages():
-    def __init__(self, id: int, msg_id: int, date: datetime) -> None:
+    def __init__(self, id: int, msg_id: int, date: datetime, reply_to: int | None) -> None:
         self.id = id
         self.msg_id = msg_id
         self.date = date
+        self.reply_to = reply_to
         self.messages: list[tg.Message] = list()
 
     def first(self):
