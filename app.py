@@ -79,6 +79,8 @@ async def main():
             logging.info(f"Posting: {group}")
             await repost(channel.id, group, test_chamber)
             memery.store(group.id)
+            if group.reply_to:
+                memery.store(group.reply_to)
             nothing_to_post = False
             break
         if nothing_to_post:
