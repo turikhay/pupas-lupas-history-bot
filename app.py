@@ -97,7 +97,7 @@ async def repost(channel_id: int, group: GroupedMessages, target: hints.EntityLi
         artifacts.append(await user.download_media(post, file="/tmp/"))
     await bot.send_message(
         target if target != None else channel,
-        message=f"[{group.date.year}](https://t.me/{channel.username}/{group.msg_id}) #MemeThrowback",
+        message=f"__[{group.date.year}](https://t.me/{channel.username}/{group.msg_id})__ #MemeThrowback",
         file=artifacts,
         reply_to=group.reply_to, # type: ignore
         silent=True,
