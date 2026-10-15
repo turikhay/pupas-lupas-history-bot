@@ -6,11 +6,11 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from tests.factories import post
+from tests.factories import group, post
 from throwback.captions import Caption
 from throwback.memery import JsonMemery
-from throwback.model import Entity, EntityKind, Group, Post
-from throwback.runner import post_throwback
+from throwback.model import Entity, EntityKind, Group, MediaKind, Post
+from throwback.runner import DryRun, post_throwback
 
 TZ = ZoneInfo("Asia/Yekaterinburg")
 TODAY = date(2026, 10, 15)
@@ -35,7 +35,9 @@ class FakeSource:
 
 
 def run(source: FakeSource, memery: JsonMemery, seed: int = 0) -> Group | None:
-    return asyncio.run(post_throwback(TODAY, START, source, memery, frozenset({"Альцгеймер"}), TZ, random.Random(seed)))
+    return asyncio.run(
+        post_throwback(TODAY, START, source, source, memery, frozenset({"Альцгеймер"}), TZ, random.Random(seed))
+    )
 
 
 @pytest.fixture
@@ -81,3 +83,12 @@ def test_returns_none_when_every_year_is_exhausted(memery: JsonMemery) -> None:
     assert run(source, memery) is None
     assert sorted(source.fetched) == [date(2024, 10, 15), date(2025, 10, 15)]
     assert source.reposted == []
+
+
+def test_dry_run_prints_the_link_media_and_caption(capsys: pytest.CaptureFixture[str]) -> None:
+    album = group(post(11, grouped_id=9), post(12, MediaKind.VIDEO, grouped_id=9))
+    link = Entity(EntityKind.TEXT_URL, 7, 4, url="https://t.me/pupaslupas/11")
+    asyncio.run(DryRun().repost(album, Caption("уговор\n\n2019 #MemeThrowback", (Entity(EntityKind.BOLD, 0, 6), link))))
+    assert capsys.readouterr().out == (
+        "Would repost https://t.me/pupaslupas/11 (photo, video) with caption:\nуговор\n\n2019 #MemeThrowback\n"
+    )

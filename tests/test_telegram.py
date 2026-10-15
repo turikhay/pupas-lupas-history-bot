@@ -9,7 +9,7 @@ from telethon import types as tg
 from tests.factories import group, post
 from throwback.captions import Caption
 from throwback.model import Entity, EntityKind, Group, MediaKind
-from throwback.telegram import Channel, media_kind, to_entities, to_post, to_telethon_entity
+from throwback.telegram import BotPublisher, media_kind, to_entities, to_post, to_telethon_entity
 
 DATE = datetime(2019, 10, 15, 12, tzinfo=UTC)
 
@@ -105,16 +105,13 @@ def photo_message(id: int) -> tg.Message:
 
 
 def repost(bot: FakeBot, group: Group, keep_replies: bool = True) -> None:
-    channel = Channel(
-        user=cast(TelegramClient, None),
+    publisher = BotPublisher(
         bot=cast(TelegramClient, bot),
-        channel=cast(tg.Channel, None),
         bot_channel=tg.InputPeerChannel(1, 0),
         target=tg.InputPeerChat(2),
-        tz=UTC,
         keep_replies=keep_replies,
     )
-    asyncio.run(channel.repost(group, Caption("caption", (Entity(EntityKind.BOLD, 0, 3),))))
+    asyncio.run(publisher.repost(group, Caption("caption", (Entity(EntityKind.BOLD, 0, 3),))))
 
 
 def test_repost_sends_the_bots_own_copies_of_an_album_by_reference() -> None:

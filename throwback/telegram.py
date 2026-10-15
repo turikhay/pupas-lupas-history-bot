@@ -86,28 +86,13 @@ def to_post(message: tg.Message) -> Post:
     )
 
 
-class Channel:
-    """Reads the channel with the user account, which (unlike the bot) can read history and see reactions,
-    and reposts with the bot by reference to the original media, so nothing is downloaded or re-encoded."""
+class ChannelHistory:
+    """Reads the channel with the user account: unlike the bot, it can read history and see reactions."""
 
-    def __init__(
-        self,
-        user: TelegramClient,
-        bot: TelegramClient,
-        channel: tg.Channel,
-        bot_channel: tg.TypeInputPeer,
-        target: tg.TypeInputPeer,
-        tz: tzinfo,
-        keep_replies: bool = True,
-    ):
+    def __init__(self, user: TelegramClient, channel: tg.Channel, tz: tzinfo):
         self._user = user
-        self._bot = bot
         self._channel = channel
-        self._bot_channel = bot_channel
-        self._target = target
         self._tz = tz
-        # Reply ids point into the channel, so they're meaningless anywhere else
-        self._keep_replies = keep_replies
 
     @property
     def username(self) -> str | None:
@@ -137,6 +122,23 @@ class Channel:
         if not posts:
             logging.warning(f"No posts found at the target date: {day}")
         return posts
+
+
+class BotPublisher:
+    """Reposts with the bot by reference to the original media, so nothing is downloaded or re-encoded."""
+
+    def __init__(
+        self,
+        bot: TelegramClient,
+        bot_channel: tg.TypeInputPeer,
+        target: tg.TypeInputPeer,
+        keep_replies: bool = True,
+    ):
+        self._bot = bot
+        self._bot_channel = bot_channel
+        self._target = target
+        # Reply ids point into the channel, so they're meaningless anywhere else
+        self._keep_replies = keep_replies
 
     async def repost(self, group: Group, caption: Caption) -> None:
         # File references are bound to the account that fetched the message, so the bot fetches its own copies
