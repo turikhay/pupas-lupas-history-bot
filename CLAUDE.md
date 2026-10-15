@@ -13,6 +13,7 @@ Telegram-бот «#MemeThrowback». За один запуск он публик
 ## Устройство
 
 - `app.py` — всё в одном файле, работа начинается при импорте. Два клиента Telethon: `user` (пользовательская сессия, читает историю канала и скачивает медиа) и `bot` (публикует).
+- `filters.py` — `can_be_reposted` для группы, без побочных эффектов (его можно импортировать в проверках, а `app.py` — нельзя).
 - `dateutils.py` — даты; `sorter.py` — ранжирование по реакциям; `message.py` — `GroupedMessages` (альбом или одиночный пост); `supported_media.py` — проверка типа медиа; `memery/` — JSON-список уже опубликованного.
 - Конфиг: `.env.defaults` (в git) ← `.env` (секреты, не в git) ← переменные окружения. Список переменных — в `docs/architecture.md`.
 - Состояние в `storage/` (в `.gitignore`): `sessions/*.session` и `memery.json`.

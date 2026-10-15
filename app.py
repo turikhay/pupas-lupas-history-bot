@@ -9,10 +9,10 @@ from random import choice, shuffle
 from telethon import TelegramClient, types as tg, hints
 
 from dateutils import today_at, years_ago, to_datetime
+from filters import can_be_reposted
 from memery.json_memery import JsonMemery
 from message import GroupedMessages
 from sorter import sort_by_best
-from supported_media import is_supported_media
 
 config = {
     **dotenv_values(".env.defaults"),
@@ -50,6 +50,7 @@ ignored_author = config["TELEGRAM_IGNORE_AUTHOR"] # type: ignore
 async def main():
     years_max = (datetime.datetime.now(tz) - search_date_start.replace(tzinfo=tz)).days // 365
     years_set = set(range(1, years_max))
+    is_wednesday = today_at(tz).weekday() == 2
     test_chamber: hints.EntityLike | None = None
     if test_chamber_id != None:
         test_chamber = await bot.get_entity(tg.PeerChat(int(test_chamber_id)))
@@ -59,7 +60,10 @@ async def main():
         years_set.remove(target_year)
         target_date = years_ago(target_year, today_at(tz))
         logging.info(f"Selected date: {target_date}")
-        collected = list(await collect_messages_at_date(channel, target_date))
+        collected = [
+            group for group in await collect_messages_at_date(channel, target_date)
+            if can_be_reposted(group, ignored_author, is_wednesday)
+        ]
         if len(collected) == 0:
             logging.info(f"Skipping date: {target_date}")
             continue
@@ -129,8 +133,6 @@ async def collect_messages_at_date(channel: tg.Channel, target_date: datetime.da
         if post.date >= next_time:
             logging.info(f"Found next date, stopping: {post.date} > {next_time}")
             break
-        if not can_be_reposted(post):
-            continue
         virtual_id = post.grouped_id if post.grouped_id != None else post.id
         if virtual_id not in posts:
             posts[virtual_id] = GroupedMessages(
@@ -144,34 +146,6 @@ async def collect_messages_at_date(channel: tg.Channel, target_date: datetime.da
     if len(posts) == 0:
         logging.warning(f"No posts found at the target date: {target_date}")
     return list(posts.values())
-
-def can_be_reposted(post: tg.Message) -> bool:
-    if post.post_author == ignored_author:
-        logging.info(f"Skipping because it's from an ignored author")
-        return False
-    if post.media == None:
-        logging.info(f"Skipping because it doesn't contain media")
-        return False
-    if not is_supported_media(post.media):
-        logging.info(f"Skipping because media is not supported: {post.media.to_dict()}")
-        return False
-    if isinstance(post.media, tg.MessageMediaDocument) and isinstance(post.media.document, tg.Document) and post.media.document.mime_type == "image/webp":
-        logging.info(f"Skipping because it's a sticker")
-        return False
-    if post.message:
-        is_wednesday = datetime.datetime.now(tz=tz).date().weekday() == 2
-        if not is_wednesday:
-            msgl = post.message.lower()
-            mentions_wednesday = any(
-                frag in msgl for frag in (
-                    "wednesday",
-                    "сред", # сред(-а,-ы,-у,...)
-                )
-            )
-            if mentions_wednesday:
-                logging.info(f"It's not Wednesday, but the post mentions it 😡")
-                return False
-    return True
 
 # The first parameter is the .session file name (absolute paths allowed)
 with user:

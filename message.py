@@ -13,5 +13,9 @@ class GroupedMessages():
         assert len(self.messages) > 0
         return self.messages[0]
 
+    def text(self) -> str:
+        # An album usually has a caption on one of its items only
+        return "\n".join(post.message for post in self.messages if post.message)
+
     def __str__(self) -> str:
         return "GroupedMessages{id=%d,msg_id=%d,date=%s,messages_count=%d}" % (self.id, self.msg_id, self.date, len(self.messages))
