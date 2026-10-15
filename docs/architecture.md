@@ -27,7 +27,7 @@
 
 1. В кандидаты попадают все значения «лет назад» `k ≥ 1`, для которых та же дата `k` лет назад не раньше `TELEGRAM_SEARCH_DATE_START` (`available_years` в [dateutils.py](../dateutils.py)).
 2. Цикл: выбрать случайное `k`, убрать его из множества, `target_date = сегодня − k лет`.
-3. `collect_messages_at_date` ([app.py:107](../app.py#L107)):
+3. `collect_messages_at_date` ([app.py:113](../app.py#L113)):
    - найти последний фото/видео-пост строго раньше полуночи `target_date` (`get_messages` с `InputMessagesFilterPhotoVideo`);
    - идти от него вперёд (`iter_messages(reverse=True, offset_id=…, limit=100)`) и брать сообщения с датой в `[полночь, полночь + 1 день)`;
    - все сообщения дня собираются в группы по `grouped_id` (альбом) или по `id`.
