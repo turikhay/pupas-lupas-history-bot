@@ -14,7 +14,8 @@ wednesday_pattern = re.compile(
     re.IGNORECASE,
 )
 
-REPOSTABLE_MEDIA = frozenset(MediaKind) - {MediaKind.NONE, MediaKind.STICKER, MediaKind.UNSUPPORTED}
+# Memes are pictures and videos: voice messages, audio, round videos and files aren't reposted
+REPOSTABLE_MEDIA = frozenset({MediaKind.PHOTO, MediaKind.VIDEO, MediaKind.GIF})
 
 NEGATIVE_EMOTICONS = frozenset(("👎", "💩", "🥱", "🤔"))
 # A paid star is worth this many ordinary reactions
