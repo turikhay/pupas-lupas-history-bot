@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 from random import choice, shuffle
 from telethon import TelegramClient, types as tg, hints
 
-from dateutils import today_at, years_ago, to_datetime
+from dateutils import available_years, today_at, years_ago, to_datetime
 from filters import THROWBACK_HASHTAG, can_be_reposted
 from memery.json_memery import JsonMemery
 from message import GroupedMessages
@@ -50,9 +50,9 @@ ignored_authors = frozenset(
 )
 
 async def main():
-    years_max = (datetime.datetime.now(tz) - search_date_start.replace(tzinfo=tz)).days // 365
-    years_set = set(range(1, years_max))
-    is_wednesday = today_at(tz).weekday() == 2
+    today = today_at(tz)
+    years_set = set(available_years(today, search_date_start.date()))
+    is_wednesday = today.weekday() == 2
     test_chamber: hints.EntityLike | None = None
     if test_chamber_id != None:
         test_chamber = await bot.get_entity(tg.PeerChat(int(test_chamber_id)))
@@ -60,7 +60,7 @@ async def main():
     while len(years_set) > 0:
         target_year = choice(list(years_set))
         years_set.remove(target_year)
-        target_date = years_ago(target_year, today_at(tz))
+        target_date = years_ago(target_year, today)
         logging.info(f"Selected date: {target_date}")
         collected = [
             group for group in await collect_messages_at_date(channel, target_date)

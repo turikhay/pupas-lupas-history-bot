@@ -14,6 +14,10 @@ def years_ago(delta: int, today: date):
         target_day = 28
     return date(today.year - delta, today.month, target_day)
 
+def available_years(today: date, start: date) -> list[int]:
+    # How many years ago the same day was, for every such day on or after start
+    return [delta for delta in range(1, today.year - start.year + 1) if years_ago(delta, today) >= start]
+
 def is_leap_year(year: int) -> bool:
     if (year % 4) == 0:
         if (year % 100) == 0:
