@@ -1,4 +1,6 @@
 import json
+import logging
+import os
 from .memery import Memery
 
 class JsonMemery(Memery):
@@ -18,9 +20,18 @@ class JsonMemery(Memery):
         return set(self.__read())
 
     def __read(self) -> list[int]:
-        with open(self.path, "r") as f:
-            return json.loads(f.read())
-        
+        try:
+            with open(self.path, "r") as f:
+                return json.loads(f.read())
+        except FileNotFoundError:
+            logging.warning(f"Memery file {self.path} doesn't exist, starting from scratch")
+            return []
+
     def __write(self, content: list[int]) -> None:
-        with open(self.path, "w") as f:
-            f.write(json.dumps(content))
+        # Write to a temp file and swap it in, so a crash can't leave broken JSON behind
+        tmp_path = self.path + ".tmp"
+        with open(tmp_path, "w") as f:
+            f.write(json.dumps(sorted(content)))
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_path, self.path)
