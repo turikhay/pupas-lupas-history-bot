@@ -2,4 +2,7 @@ venv
 .env
 storage
 __pycache__/
+.venv
+.pytest_cache/
+.ruff_cache/
 compose.override.yaml
