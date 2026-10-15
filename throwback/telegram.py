@@ -1,5 +1,4 @@
 import logging
-import tempfile
 from datetime import date, timedelta, tzinfo
 
 from telethon import TelegramClient
@@ -50,16 +49,27 @@ def to_post(message: tg.Message) -> Post:
 
 
 class Channel:
-    """Reads the channel history with the user account and reposts with the bot."""
+    """Reads the channel with the user account, which (unlike the bot) can read history and see reactions,
+    and reposts with the bot by reference to the original media, so nothing is downloaded or re-encoded."""
 
-    def __init__(self, user: TelegramClient, bot: TelegramClient, channel: tg.Channel, target, tz: tzinfo):
+    def __init__(
+        self,
+        user: TelegramClient,
+        bot: TelegramClient,
+        channel: tg.Channel,
+        bot_channel: tg.TypeInputPeer,
+        target: tg.TypeInputPeer,
+        tz: tzinfo,
+        keep_replies: bool = True,
+    ):
         self._user = user
         self._bot = bot
         self._channel = channel
+        self._bot_channel = bot_channel
         self._target = target
         self._tz = tz
-        # Telethon messages behind the posts handed out, needed to download their media
-        self._messages: dict[int, tg.Message] = {}
+        # Reply ids point into the channel, so they're meaningless anywhere else
+        self._keep_replies = keep_replies
 
     @property
     def username(self) -> str | None:
@@ -85,25 +95,22 @@ class Channel:
                 continue
             if message.date >= day_end:
                 break
-            self._messages[message.id] = message
             posts.append(to_post(message))
         if not posts:
             logging.warning(f"No posts found at the target date: {day}")
         return posts
 
     async def repost(self, group: Group, caption: str) -> None:
-        messages = [self._messages[post.id] for post in group.posts]
-        with tempfile.TemporaryDirectory(prefix="throwback-") as tmp:
-            files: list[str] = []
-            for message in messages:
-                path = await self._user.download_media(message, file=tmp)
-                if not isinstance(path, str):
-                    raise RuntimeError(f"Couldn't download the media of message {message.id}")
-                files.append(path)
-            await self._bot.send_message(
-                self._target,
-                message=caption,
-                file=files,
-                reply_to=group.reply_to,  # type: ignore[arg-type]
-                silent=True,
-            )
+        # File references are bound to the account that fetched the message, so the bot fetches its own copies
+        messages = await self._bot.get_messages(self._bot_channel, ids=[post.id for post in group.posts])
+        assert isinstance(messages, list)
+        media = [message.media for message in messages if message is not None and message.media is not None]
+        if len(media) != len(group.posts):
+            raise RuntimeError(f"Some messages of {group} are gone or have no media")
+        await self._bot.send_file(
+            self._target,
+            media if len(media) > 1 else media[0],
+            caption=caption,
+            reply_to=group.reply_to if self._keep_replies else None,  # type: ignore[arg-type]
+            silent=True,
+        )

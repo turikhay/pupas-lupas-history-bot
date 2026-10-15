@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from throwback.memery import JsonMemery
+from throwback.memery import JsonMemery, ReadOnlyMemery
 
 
 def test_starts_empty_without_a_file(tmp_path: Path) -> None:
@@ -25,3 +25,13 @@ def test_reads_existing_file(tmp_path: Path) -> None:
     path.write_text("[3, 1, 2]")
     memery = JsonMemery(str(path))
     assert all(memery.is_posted_already(id) for id in (1, 2, 3))
+
+
+def test_read_only_memery_reads_but_never_writes(tmp_path: Path) -> None:
+    path = tmp_path / "memery.json"
+    path.write_text("[1]")
+    memery = ReadOnlyMemery(JsonMemery(str(path)))
+    assert memery.is_posted_already(1)
+    memery.store(2)
+    assert not memery.is_posted_already(2)
+    assert json.loads(path.read_text()) == [1]

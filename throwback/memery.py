@@ -12,6 +12,19 @@ class Memery(Protocol):
     def store(self, id: int) -> None: ...
 
 
+class ReadOnlyMemery:
+    """For test runs: skips what's already posted, but doesn't mark anything as posted."""
+
+    def __init__(self, memery: Memery):
+        self._memery = memery
+
+    def is_posted_already(self, id: int) -> bool:
+        return self._memery.is_posted_already(id)
+
+    def store(self, id: int) -> None:
+        logging.info(f"Test run, not remembering {id}")
+
+
 class JsonMemery:
     def __init__(self, path: str):
         self.path = path

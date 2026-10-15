@@ -1,10 +1,14 @@
+import asyncio
 from datetime import UTC, datetime
+from typing import Any, cast
 
 import pytest
+from telethon import TelegramClient
 from telethon import types as tg
 
-from throwback.model import MediaKind
-from throwback.telegram import media_kind, to_post
+from tests.factories import group, post
+from throwback.model import Group, MediaKind
+from throwback.telegram import Channel, media_kind, to_post
 
 DATE = datetime(2019, 10, 15, 12, tzinfo=UTC)
 
@@ -77,3 +81,65 @@ def test_to_post() -> None:
 def test_to_post_without_caption_and_reactions() -> None:
     post = to_post(tg.Message(id=1, peer_id=tg.PeerChannel(1), date=DATE, message=""))
     assert (post.text, post.media, post.reply_to, post.reactions) == ("", MediaKind.NONE, None, {})
+
+
+class FakeBot:
+    def __init__(self, messages: dict[int, tg.Message]):
+        self.messages = messages
+        self.requested: list[int] = []
+        self.sent: list[tuple[Any, Any, dict[str, Any]]] = []
+
+    async def get_messages(self, entity: Any, ids: list[int]) -> list[tg.Message | None]:
+        self.requested += ids
+        return [self.messages.get(id) for id in ids]
+
+    async def send_file(self, entity: Any, file: Any, **kwargs: Any) -> None:
+        self.sent.append((entity, file, kwargs))
+
+
+def photo_message(id: int) -> tg.Message:
+    return tg.Message(
+        id=id, peer_id=tg.PeerChannel(1), date=DATE, message="", media=tg.MessageMediaPhoto(photo=tg.PhotoEmpty(id=id))
+    )
+
+
+def repost(bot: FakeBot, group: Group, keep_replies: bool = True) -> None:
+    channel = Channel(
+        user=cast(TelegramClient, None),
+        bot=cast(TelegramClient, bot),
+        channel=cast(tg.Channel, None),
+        bot_channel=tg.InputPeerChannel(1, 0),
+        target=tg.InputPeerChat(2),
+        tz=UTC,
+        keep_replies=keep_replies,
+    )
+    asyncio.run(channel.repost(group, "caption"))
+
+
+def test_repost_sends_the_bots_own_copies_of_an_album_by_reference() -> None:
+    bot = FakeBot({11: photo_message(11), 12: photo_message(12)})
+    repost(bot, group(post(11, grouped_id=9, reply_to=3), post(12, grouped_id=9)))
+    assert bot.requested == [11, 12]
+    [(target, media, kwargs)] = bot.sent
+    assert target == tg.InputPeerChat(2)
+    assert media == [bot.messages[11].media, bot.messages[12].media]
+    assert kwargs == {"caption": "caption", "reply_to": 3, "silent": True}
+
+
+def test_repost_sends_a_single_post_as_one_media() -> None:
+    bot = FakeBot({11: photo_message(11)})
+    repost(bot, group(post(11)))
+    assert bot.sent[0][1] == bot.messages[11].media
+
+
+def test_repost_drops_replies_outside_the_channel() -> None:
+    bot = FakeBot({11: photo_message(11)})
+    repost(bot, group(post(11, reply_to=3)), keep_replies=False)
+    assert bot.sent[0][2]["reply_to"] is None
+
+
+def test_repost_fails_when_a_message_is_gone() -> None:
+    bot = FakeBot({11: photo_message(11)})
+    with pytest.raises(RuntimeError, match="gone"):
+        repost(bot, group(post(11, grouped_id=9), post(12, grouped_id=9)))
+    assert bot.sent == []
