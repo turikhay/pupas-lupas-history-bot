@@ -141,26 +141,20 @@ class ChannelHistory:
     async def fetch_day(self, day: date) -> list[Post]:
         day_start = start_of_day(day, self._tz)
         day_end = day_start + timedelta(days=1)
-        # The last media post before the day, to iterate forward from it
-        anchor = await self._user.get_messages(
-            self._channel, limit=1, offset_date=day_start, filter=tg.InputMessagesFilterPhotoVideo
-        )
-        if not isinstance(anchor, list) or not anchor:
-            logging.warning(f"get_messages returned empty list for {self._channel.id}")
-            return []
         messages: list[tg.Message] = []
-        async for message in self._user.iter_messages(self._channel, reverse=True, offset_id=anchor[0].id, limit=100):
+        # Newest first, from the end of the day back to its start, however many messages there are
+        async for message in self._user.iter_messages(self._channel, offset_date=day_end):
+            assert message.date is not None
+            if message.date < day_start:
+                break
             if not isinstance(message, tg.Message):
                 logging.info(f"Skipping {message.id}: it's not a message ({type(message).__name__})")
                 continue
-            assert message.date is not None
-            if message.date < day_start:
-                continue
-            if message.date >= day_end:
-                break
             messages.append(message)
         if not messages:
             logging.warning(f"No posts found at the target date: {day}")
+        # Oldest first, so that albums keep their order
+        messages.reverse()
         await resolve_custom_emoji(self._user, custom_emoji_ids(messages), self._custom_emoji)
         return [to_post(message, self._custom_emoji) for message in messages]
 
