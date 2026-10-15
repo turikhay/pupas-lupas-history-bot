@@ -1,14 +1,18 @@
 import logging
+from collections.abc import Collection
 from telethon import types as tg
 
 from message import GroupedMessages
 from supported_media import is_supported_media
 
-def can_be_reposted(group: GroupedMessages, ignored_author: str, is_wednesday: bool) -> bool:
+# Every repost is captioned with it, so it also marks the bot's own posts
+THROWBACK_HASHTAG = "#MemeThrowback"
+
+def can_be_reposted(group: GroupedMessages, ignored_authors: Collection[str], is_wednesday: bool) -> bool:
     # Albums are reposted as a whole, so a single bad item rejects the group
     for post in group.messages:
-        if post.post_author == ignored_author:
-            logging.info(f"Skipping {group}: it's from an ignored author")
+        if post.post_author in ignored_authors:
+            logging.info(f"Skipping {group}: it's from an ignored author ({post.post_author})")
             return False
         if post.media == None:
             logging.info(f"Skipping {group}: message {post.id} doesn't contain media")
@@ -20,6 +24,10 @@ def can_be_reposted(group: GroupedMessages, ignored_author: str, is_wednesday: b
             logging.info(f"Skipping {group}: message {post.id} is a sticker")
             return False
     text = group.text()
+    if THROWBACK_HASHTAG.lower() in text.lower():
+        # Signatures can't be trusted alone: they change with the bot's name
+        logging.info(f"Skipping {group}: it's our own repost")
+        return False
     if text and not is_wednesday:
         msgl = text.lower()
         mentions_wednesday = any(

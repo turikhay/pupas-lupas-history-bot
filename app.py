@@ -9,7 +9,7 @@ from random import choice, shuffle
 from telethon import TelegramClient, types as tg, hints
 
 from dateutils import today_at, years_ago, to_datetime
-from filters import can_be_reposted
+from filters import THROWBACK_HASHTAG, can_be_reposted
 from memery.json_memery import JsonMemery
 from message import GroupedMessages
 from sorter import sort_by_best
@@ -45,7 +45,9 @@ bot = TelegramClient(
 test_chamber_id = config["TELEGRAM_TEST_CHAMBER_ID"] if "TELEGRAM_TEST_CHAMBER_ID" in config else None
 channel_id: int = int(config["TELEGRAM_CHANNEL_ID"]) # type: ignore
 search_date_start = datetime.datetime.strptime(config["TELEGRAM_SEARCH_DATE_START"], '%Y-%m-%d') # type: ignore
-ignored_author = config["TELEGRAM_IGNORE_AUTHOR"] # type: ignore
+ignored_authors = frozenset(
+    author.strip() for author in (config["TELEGRAM_IGNORE_AUTHOR"] or "").split(",") if author.strip()
+)
 
 async def main():
     years_max = (datetime.datetime.now(tz) - search_date_start.replace(tzinfo=tz)).days // 365
@@ -62,7 +64,7 @@ async def main():
         logging.info(f"Selected date: {target_date}")
         collected = [
             group for group in await collect_messages_at_date(channel, target_date)
-            if can_be_reposted(group, ignored_author, is_wednesday)
+            if can_be_reposted(group, ignored_authors, is_wednesday)
         ]
         if len(collected) == 0:
             logging.info(f"Skipping date: {target_date}")
@@ -101,7 +103,7 @@ async def repost(channel_id: int, group: GroupedMessages, target: hints.EntityLi
         artifacts.append(await user.download_media(post, file="/tmp/"))
     await bot.send_message(
         target if target != None else channel,
-        message=f"[{group.date.year}](https://t.me/{channel.username}/{group.msg_id}) #MemeThrowback",
+        message=f"[{group.date.year}](https://t.me/{channel.username}/{group.msg_id}) {THROWBACK_HASHTAG}",
         file=artifacts,
         reply_to=group.reply_to, # type: ignore
         silent=True,
