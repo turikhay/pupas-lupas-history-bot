@@ -6,10 +6,11 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from tests.factories import group, post
+from tests.factories import post
+from throwback.captions import Caption
 from throwback.memery import JsonMemery
-from throwback.model import Group, Post
-from throwback.runner import caption, post_throwback
+from throwback.model import Entity, EntityKind, Group, Post
+from throwback.runner import post_throwback
 
 TZ = ZoneInfo("Asia/Yekaterinburg")
 TODAY = date(2026, 10, 15)
@@ -23,13 +24,13 @@ class FakeSource:
     def __init__(self, days: dict[date, list[Post]]):
         self.days = days
         self.fetched: list[date] = []
-        self.reposted: list[tuple[Group, str]] = []
+        self.reposted: list[tuple[Group, Caption]] = []
 
     async def fetch_day(self, day: date) -> list[Post]:
         self.fetched.append(day)
         return self.days.get(day, [])
 
-    async def repost(self, group: Group, caption: str) -> None:
+    async def repost(self, group: Group, caption: Caption) -> None:
         self.reposted.append((group, caption))
 
 
@@ -48,13 +49,14 @@ def test_reposts_the_best_group_and_remembers_it(memery: JsonMemery) -> None:
             date(2025, 10, 15): [
                 post(10, reactions={"🔥": 1}, date=NOON_2025),
                 post(11, grouped_id=99, reactions={"🔥": 5}, reply_to=3, date=NOON_2025),
-                post(12, grouped_id=99, date=NOON_2025),
+                post(12, grouped_id=99, text="Мем дня #мем", date=NOON_2025),
             ]
         }
     )
     posted = run(source, memery)
     assert posted is not None and [p.id for p in posted.posts] == [11, 12]
-    assert source.reposted == [(posted, "[2025](https://t.me/pupaslupas/11) #MemeThrowback")]
+    link = Entity(EntityKind.TEXT_URL, 14, 4, url="https://t.me/pupaslupas/11")
+    assert source.reposted == [(posted, Caption("Мем дня #мем\n\n2025 #MemeThrowback", (link,)))]
     assert memery.is_posted_already(99)
     assert memery.is_posted_already(3)
     assert not memery.is_posted_already(10)
@@ -79,9 +81,3 @@ def test_returns_none_when_every_year_is_exhausted(memery: JsonMemery) -> None:
     assert run(source, memery) is None
     assert sorted(source.fetched) == [date(2024, 10, 15), date(2025, 10, 15)]
     assert source.reposted == []
-
-
-def test_caption_year_is_in_the_channel_timezone() -> None:
-    # 20:00 UTC on Dec 31 is already Jan 1 in Yekaterinburg
-    new_year = group(post(7, date=datetime(2019, 12, 31, 20, tzinfo=UTC)))
-    assert caption(new_year, "pupaslupas", TZ) == "[2020](https://t.me/pupaslupas/7) #MemeThrowback"

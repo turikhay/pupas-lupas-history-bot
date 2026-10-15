@@ -7,8 +7,9 @@ from telethon import TelegramClient
 from telethon import types as tg
 
 from tests.factories import group, post
-from throwback.model import Group, MediaKind
-from throwback.telegram import Channel, media_kind, to_post
+from throwback.captions import Caption
+from throwback.model import Entity, EntityKind, Group, MediaKind
+from throwback.telegram import Channel, media_kind, to_entities, to_post, to_telethon_entity
 
 DATE = datetime(2019, 10, 15, 12, tzinfo=UTC)
 
@@ -113,7 +114,7 @@ def repost(bot: FakeBot, group: Group, keep_replies: bool = True) -> None:
         tz=UTC,
         keep_replies=keep_replies,
     )
-    asyncio.run(channel.repost(group, "caption"))
+    asyncio.run(channel.repost(group, Caption("caption", (Entity(EntityKind.BOLD, 0, 3),))))
 
 
 def test_repost_sends_the_bots_own_copies_of_an_album_by_reference() -> None:
@@ -123,7 +124,13 @@ def test_repost_sends_the_bots_own_copies_of_an_album_by_reference() -> None:
     [(target, media, kwargs)] = bot.sent
     assert target == tg.InputPeerChat(2)
     assert media == [bot.messages[11].media, bot.messages[12].media]
-    assert kwargs == {"caption": "caption", "reply_to": 3, "silent": True}
+    assert kwargs == {
+        "caption": "caption",
+        "formatting_entities": [tg.MessageEntityBold(0, 3)],
+        "parse_mode": None,
+        "reply_to": 3,
+        "silent": True,
+    }
 
 
 def test_repost_sends_a_single_post_as_one_media() -> None:
@@ -143,3 +150,35 @@ def test_repost_fails_when_a_message_is_gone() -> None:
     with pytest.raises(RuntimeError, match="gone"):
         repost(bot, group(post(11, grouped_id=9), post(12, grouped_id=9)))
     assert bot.sent == []
+
+
+def test_to_entities_keeps_formatting_only() -> None:
+    entities = to_entities(
+        [
+            tg.MessageEntityBold(0, 3),
+            tg.MessageEntityTextUrl(4, 5, url="https://example.com"),
+            tg.MessageEntityPre(10, 2, language="py"),
+            tg.MessageEntityHashtag(13, 4),
+            tg.MessageEntityUrl(18, 10),
+            tg.MessageEntityMention(29, 5),
+            tg.MessageEntityCustomEmoji(35, 2, document_id=7),
+        ]
+    )
+    assert entities == (
+        Entity(EntityKind.BOLD, 0, 3),
+        Entity(EntityKind.TEXT_URL, 4, 5, url="https://example.com"),
+        Entity(EntityKind.PRE, 10, 2, language="py"),
+    )
+    assert to_entities(None) == ()
+
+
+@pytest.mark.parametrize("kind", list(EntityKind))
+def test_entities_round_trip(kind: EntityKind) -> None:
+    entity = Entity(
+        kind,
+        3,
+        4,
+        url="https://example.com" if kind is EntityKind.TEXT_URL else None,
+        language="py" if kind is EntityKind.PRE else None,
+    )
+    assert to_entities([to_telethon_entity(entity)]) == (entity,)

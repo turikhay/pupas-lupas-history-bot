@@ -4,8 +4,22 @@ from datetime import date, timedelta, tzinfo
 from telethon import TelegramClient
 from telethon import types as tg
 
+from .captions import Caption
 from .dates import start_of_day
-from .model import Group, MediaKind, Post
+from .model import Entity, EntityKind, Group, MediaKind, Post
+
+_ENTITY_TYPES: dict[EntityKind, type] = {
+    EntityKind.BOLD: tg.MessageEntityBold,
+    EntityKind.ITALIC: tg.MessageEntityItalic,
+    EntityKind.UNDERLINE: tg.MessageEntityUnderline,
+    EntityKind.STRIKE: tg.MessageEntityStrike,
+    EntityKind.SPOILER: tg.MessageEntitySpoiler,
+    EntityKind.CODE: tg.MessageEntityCode,
+    EntityKind.PRE: tg.MessageEntityPre,
+    EntityKind.TEXT_URL: tg.MessageEntityTextUrl,
+    EntityKind.BLOCKQUOTE: tg.MessageEntityBlockquote,
+}
+_ENTITY_KINDS = {telethon_type: kind for kind, telethon_type in _ENTITY_TYPES.items()}
 
 
 def media_kind(media: tg.TypeMessageMedia | None) -> MediaKind:
@@ -34,6 +48,29 @@ def emoji_reactions(reactions: tg.MessageReactions | None) -> dict[str, int]:
     return {r.reaction.emoticon: r.count for r in reactions.results if isinstance(r.reaction, tg.ReactionEmoji)}
 
 
+def to_entities(entities: list[tg.TypeMessageEntity] | None) -> tuple[Entity, ...]:
+    # Links, mentions and hashtags are detected by Telegram again; custom emoji fall back to their plain emoji
+    return tuple(
+        Entity(
+            kind=_ENTITY_KINDS[type(entity)],
+            offset=entity.offset,
+            length=entity.length,
+            url=entity.url if isinstance(entity, tg.MessageEntityTextUrl) else None,
+            language=entity.language if isinstance(entity, tg.MessageEntityPre) else None,
+        )
+        for entity in entities or ()
+        if type(entity) in _ENTITY_KINDS
+    )
+
+
+def to_telethon_entity(entity: Entity) -> tg.TypeMessageEntity:
+    if entity.kind is EntityKind.TEXT_URL:
+        return tg.MessageEntityTextUrl(entity.offset, entity.length, url=entity.url or "")
+    if entity.kind is EntityKind.PRE:
+        return tg.MessageEntityPre(entity.offset, entity.length, language=entity.language or "")
+    return _ENTITY_TYPES[entity.kind](entity.offset, entity.length)
+
+
 def to_post(message: tg.Message) -> Post:
     assert message.date is not None
     return Post(
@@ -41,6 +78,7 @@ def to_post(message: tg.Message) -> Post:
         date=message.date,
         media=media_kind(message.media),
         text=message.message or "",
+        entities=to_entities(message.entities),
         grouped_id=message.grouped_id,
         author=message.post_author,
         reply_to=message.reply_to.reply_to_msg_id if isinstance(message.reply_to, tg.MessageReplyHeader) else None,
@@ -100,7 +138,7 @@ class Channel:
             logging.warning(f"No posts found at the target date: {day}")
         return posts
 
-    async def repost(self, group: Group, caption: str) -> None:
+    async def repost(self, group: Group, caption: Caption) -> None:
         # File references are bound to the account that fetched the message, so the bot fetches its own copies
         messages = await self._bot.get_messages(self._bot_channel, ids=[post.id for post in group.posts])
         assert isinstance(messages, list)
@@ -110,7 +148,10 @@ class Channel:
         await self._bot.send_file(
             self._target,
             media if len(media) > 1 else media[0],
-            caption=caption,
+            caption=caption.text,
+            # Ready-made entities, so that the original text isn't parsed as markdown
+            formatting_entities=[to_telethon_entity(entity) for entity in caption.entities],
+            parse_mode=None,
             reply_to=group.reply_to if self._keep_replies else None,  # type: ignore[arg-type]
             silent=True,
         )

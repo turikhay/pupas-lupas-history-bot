@@ -4,10 +4,11 @@ from collections.abc import Collection
 from datetime import date, tzinfo
 from typing import Protocol
 
+from .captions import Caption, build_caption
 from .dates import available_years, years_ago
 from .memery import Memery
 from .model import Group, Post
-from .selection import THROWBACK_HASHTAG, can_be_reposted, group_posts, rank
+from .selection import can_be_reposted, group_posts, rank
 
 
 class Source(Protocol):
@@ -16,13 +17,7 @@ class Source(Protocol):
 
     async def fetch_day(self, day: date) -> list[Post]: ...
 
-    async def repost(self, group: Group, caption: str) -> None: ...
-
-
-def caption(group: Group, username: str | None, tz: tzinfo) -> str:
-    # The year in the channel's timezone: a post at 00:30 on Jan 1 is not from the previous year
-    year = group.first.date.astimezone(tz).year
-    return f"[{year}](https://t.me/{username}/{group.first.id}) {THROWBACK_HASHTAG}"
+    async def repost(self, group: Group, caption: Caption) -> None: ...
 
 
 async def post_throwback(
@@ -53,7 +48,7 @@ async def post_throwback(
                 logging.info(f"Already posted: {group.key}")
                 continue
             logging.info(f"Posting: {group}")
-            await source.repost(group, caption(group, source.username, tz))
+            await source.repost(group, build_caption(group, source.username, tz))
             memery.store(group.key)
             if group.reply_to:
                 # Reposting a reply quotes the original, so don't repost the original later

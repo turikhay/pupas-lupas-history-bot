@@ -17,6 +17,29 @@ class MediaKind(StrEnum):
     UNSUPPORTED = "unsupported"
 
 
+class EntityKind(StrEnum):
+    BOLD = "bold"
+    ITALIC = "italic"
+    UNDERLINE = "underline"
+    STRIKE = "strike"
+    SPOILER = "spoiler"
+    CODE = "code"
+    PRE = "pre"
+    TEXT_URL = "text_url"
+    BLOCKQUOTE = "blockquote"
+
+
+@dataclass(frozen=True)
+class Entity:
+    """Text formatting; offsets and lengths are in UTF-16 code units, as Telegram counts them."""
+
+    kind: EntityKind
+    offset: int
+    length: int
+    url: str | None = None  # TEXT_URL
+    language: str | None = None  # PRE
+
+
 @dataclass(frozen=True)
 class Post:
     """A channel message, detached from Telethon so that the selection logic can be tested offline."""
@@ -25,6 +48,8 @@ class Post:
     date: datetime  # aware, as Telegram reports it (UTC)
     media: MediaKind
     text: str = ""
+    # Formatting of the text; links, mentions and hashtags are left to Telegram to detect again
+    entities: tuple[Entity, ...] = ()
     grouped_id: int | None = None
     author: str | None = None
     reply_to: int | None = None

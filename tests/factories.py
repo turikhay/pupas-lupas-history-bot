@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from throwback.model import Group, MediaKind, Post
+from throwback.model import Entity, Group, MediaKind, Post
 
 DATE = datetime(2019, 10, 15, 12, tzinfo=UTC)
 
@@ -9,6 +9,7 @@ def post(
     id: int,
     media: MediaKind = MediaKind.PHOTO,
     text: str = "",
+    entities: tuple[Entity, ...] = (),
     grouped_id: int | None = None,
     author: str | None = None,
     reply_to: int | None = None,
@@ -20,6 +21,7 @@ def post(
         date=date,
         media=media,
         text=text,
+        entities=entities,
         grouped_id=grouped_id,
         author=author,
         reply_to=reply_to,
