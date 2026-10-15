@@ -29,6 +29,8 @@
 **/npm-debug.log
 **/obj
 **/secrets.dev.yaml
+# Telegram sessions (full account access) and bot state, mounted at runtime
+**/storage
 **/values.dev.yaml
 LICENSE
 README.md
