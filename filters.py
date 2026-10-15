@@ -1,4 +1,5 @@
 import logging
+import re
 from collections.abc import Collection
 from telethon import types as tg
 
@@ -7,6 +8,12 @@ from supported_media import is_supported_media
 
 # Every repost is captioned with it, so it also marks the bot's own posts
 THROWBACK_HASHTAG = "#MemeThrowback"
+
+# Whole words only: a bare "сред" prefix also matches "среди", "средство", "средний"
+wednesday_pattern = re.compile(
+    r"\b(wednesdays?|сред(а|у|ы|е|ой|ою|ам|ами|ах)?)\b",
+    re.IGNORECASE,
+)
 
 def can_be_reposted(group: GroupedMessages, ignored_authors: Collection[str], is_wednesday: bool) -> bool:
     # Albums are reposted as a whole, so a single bad item rejects the group
@@ -28,15 +35,7 @@ def can_be_reposted(group: GroupedMessages, ignored_authors: Collection[str], is
         # Signatures can't be trusted alone: they change with the bot's name
         logging.info(f"Skipping {group}: it's our own repost")
         return False
-    if text and not is_wednesday:
-        msgl = text.lower()
-        mentions_wednesday = any(
-            frag in msgl for frag in (
-                "wednesday",
-                "сред", # сред(-а,-ы,-у,...)
-            )
-        )
-        if mentions_wednesday:
-            logging.info(f"Skipping {group}: it's not Wednesday, but the post mentions it 😡")
-            return False
+    if not is_wednesday and wednesday_pattern.search(text):
+        logging.info(f"Skipping {group}: it's not Wednesday, but the post mentions it 😡")
+        return False
     return True
