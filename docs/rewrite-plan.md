@@ -35,18 +35,19 @@
 class Post:
     id: int
     grouped_id: int | None
-    date: datetime            # aware, UTC
-    kind: MediaKind           # photo / video / gif / sticker / voice / document / none
+    date: datetime  # aware, UTC
+    kind: MediaKind  # photo / video / gif / sticker / voice / document / none
     text: str
     author: str | None
     reply_to: int | None
-    reactions: dict[str, int] # "👍" → 12, "custom:<id>" → 3, "paid" → 50
+    reactions: dict[str, int]  # "👍" → 12, "custom:<id>" → 3, "paid" → 50
     views: int | None
     forwards: int | None
 
+
 @dataclass(frozen=True)
 class Group:
-    key: int                  # минимальный id в группе — то же пространство, что id сообщений
+    key: int  # минимальный id в группе — то же пространство, что id сообщений
     posts: tuple[Post, ...]
 ```
 
@@ -126,24 +127,24 @@ python -m throwback migrate-memery storage/memery.json
 - Docker: добавить `storage` в `.dockerignore`, `CMD` в exec-форме, непривилегированный пользователь.
 - `chmod 600 storage/sessions/*.session`.
 
-## Предлагаемая структура
+## Структура
+
+После этапа 2 пакет лежит в корне (`throwback/`, без `src/`): это приложение, а не библиотека, и `python -m throwback` работает из корня без установки. Уже есть модули, отмеченные ✅; остальные появятся на следующих этапах.
 
 ```
-pyproject.toml
-uv.lock
-src/throwback/
-  __main__.py      # CLI: run / sync / migrate-memery
-  config.py        # настройки из env, с валидацией
-  model.py         # Post, Group, MediaKind — без Telethon
-  dates.py         # сегодня в TZ, N лет назад, доступные годы
-  selection.py     # группировка, фильтры, скоринг, выбор года
-  store.py         # SQLite: posts, reposts, legacy_memery
-  telegram.py      # Telethon: fetch_by_ids, to_post, send_group
-  index.py         # синхронизация индекса по id
-tests/
-  test_dates.py      # 29 февраля, доступные годы, граница TZ (пост в 00:30 1 января)
-  test_selection.py  # альбом с подписью про среду, свои репосты, частичные альбомы
-  test_store.py      # миграция legacy, повторный запуск
+pyproject.toml, uv.lock  ✅
+throwback/
+  __main__.py      ✅ точка входа; позже CLI: run / sync / migrate-memery
+  config.py        ✅ настройки из env, с валидацией
+  model.py         ✅ Post, Group, MediaKind — без Telethon
+  dates.py         ✅ сегодня в TZ, N лет назад, доступные годы
+  selection.py     ✅ группировка, фильтры, скоринг
+  runner.py        ✅ один запуск поверх протокола Source
+  memery.py        ✅ JSON-список опубликованного (заменит store.py)
+  telegram.py      ✅ Telethon: to_post, Channel (позже fetch_by_ids, send по ссылке)
+  store.py         SQLite: posts, reposts, legacy_memery
+  index.py         синхронизация индекса по id
+tests/             ✅ даты, фильтры, ранжирование, перевод сообщений Telethon, memery, конфиг, runner
 deploy/
   throwback.service
   throwback.timer
@@ -161,4 +162,8 @@ deploy/
 | 5. Эксплуатация | режимы `--dry-run` и `--target test`, коды выхода, алерты, расписание в репозитории | падения видны, форматирование проверяется за секунды |
 | 6. Продуктовые улучшения | новый скоринг, перенос подписи оригинала, мемы про среду в приоритете по средам | — |
 
-Этап 0 выполнен в октябре 2026: исправлены пункты 1, 2, 3, 5 и частично 8 и 14 обзора, статусы — в [review.md](review.md). Вне репозитория осталось выставить `chmod 600` на `*.session` на сервере (локально уже сделано).
+Статус на 2026-10-15:
+
+- **Этап 0 выполнен:** исправлены пункты 1, 2, 3, 5 и частично 8 и 14 обзора, статусы — в [review.md](review.md). Вне репозитория осталось выставить `chmod 600` на `*.session` на сервере (локально уже сделано).
+- **Этап 1 частично:** результаты в [spike-bot-only.md](spike-bot-only.md). Не проверена пересылка по ссылке, нужен тестовый чат, куда бот может писать. Ждёт решения: ранжировать без реакций или оставить пользовательский аккаунт.
+- **Этап 2 выполнен:** пакет `throwback/`, 76 тестов без сети, `uv.lock`, Python 3.12 везде, Telethon 1.45, CI с ruff, pyright и pytest. Добавлен `TELEGRAM_PROXY` для запуска там, где Telegram заблокирован. Поведение бота не менялось, кроме двух мелочей: временные файлы удаляются, стикеры распознаются ещё и по атрибуту (`.tgs`, `.webm`).
