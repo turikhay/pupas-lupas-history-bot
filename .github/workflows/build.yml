@@ -4,13 +4,42 @@ on:
   push:
     branches:
       - "main"
+  pull_request:
 
 env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
+  check:
+    name: Lint, type-check & test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.12.20"
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Lint
+        run: |
+          uv run ruff check
+          uv run ruff format --check
+
+      - name: Type-check
+        run: uv run pyright
+
+      - name: Test
+        run: uv run pytest
+
   push_to_registries:
     name: Push to Container registry
+    needs: check
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       packages: write
