@@ -17,6 +17,8 @@ wednesday_pattern = re.compile(
 REPOSTABLE_MEDIA = frozenset(MediaKind) - {MediaKind.NONE, MediaKind.STICKER, MediaKind.UNSUPPORTED}
 
 NEGATIVE_EMOTICONS = frozenset(("👎", "💩", "🥱", "🤔"))
+# A paid star is worth this many ordinary reactions
+STAR_WEIGHT = 10
 
 
 def group_posts(posts: Iterable[Post]) -> list[Group]:
@@ -48,7 +50,9 @@ def can_be_reposted(group: Group, ignored_authors: Collection[str], is_wednesday
 
 
 def score(group: Group) -> int:
-    return sum(-count if emoticon in NEGATIVE_EMOTICONS else count for emoticon, count in group.first.reactions.items())
+    post = group.first
+    reactions = sum(-count if emoticon in NEGATIVE_EMOTICONS else count for emoticon, count in post.reactions.items())
+    return reactions + STAR_WEIGHT * post.stars
 
 
 def rank(groups: Sequence[Group], rng: random.Random) -> list[Group]:

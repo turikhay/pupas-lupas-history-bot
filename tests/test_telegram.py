@@ -3,13 +3,23 @@ from datetime import UTC, datetime
 from typing import Any, cast
 
 import pytest
-from telethon import TelegramClient
+from telethon import TelegramClient, functions
 from telethon import types as tg
 
 from tests.factories import group, post
 from throwback.captions import Caption
 from throwback.model import Entity, EntityKind, Group, MediaKind
-from throwback.telegram import BotPublisher, media_kind, to_entities, to_post, to_telethon_entity
+from throwback.telegram import (
+    BotPublisher,
+    custom_emoji_ids,
+    emoji_reactions,
+    media_kind,
+    paid_stars,
+    resolve_custom_emoji,
+    to_entities,
+    to_post,
+    to_telethon_entity,
+)
 
 DATE = datetime(2019, 10, 15, 12, tzinfo=UTC)
 
@@ -179,3 +189,92 @@ def test_entities_round_trip(kind: EntityKind) -> None:
         language="py" if kind is EntityKind.PRE else None,
     )
     assert to_entities([to_telethon_entity(entity)]) == (entity,)
+
+
+SMILE_ID, HEART_ID, UNKNOWN_ID = 101, 102, 103
+
+
+def reactions(*results: tuple[tg.TypeReaction, int]) -> tg.MessageReactions:
+    return tg.MessageReactions(results=[tg.ReactionCount(reaction=r, count=n) for r, n in results])
+
+
+def test_custom_emoji_count_as_the_emoji_they_stand_for() -> None:
+    counts = emoji_reactions(
+        reactions(
+            (tg.ReactionEmoji("❤"), 2),
+            (tg.ReactionCustomEmoji(HEART_ID), 3),
+            (tg.ReactionCustomEmoji(SMILE_ID), 1),
+            (tg.ReactionCustomEmoji(UNKNOWN_ID), 7),
+            (tg.ReactionPaid(), 5),
+        ),
+        {HEART_ID: "❤️", SMILE_ID: "😀"},
+    )
+    assert counts == {"❤": 5, "😀": 1}
+
+
+def test_paid_stars() -> None:
+    assert paid_stars(reactions((tg.ReactionEmoji("🔥"), 2), (tg.ReactionPaid(), 5))) == 5
+    assert paid_stars(None) == 0
+
+
+def test_to_post_counts_custom_emoji_and_stars() -> None:
+    message = tg.Message(
+        id=1,
+        peer_id=tg.PeerChannel(1),
+        date=DATE,
+        message="",
+        reactions=reactions((tg.ReactionCustomEmoji(SMILE_ID), 2), (tg.ReactionPaid(), 3)),
+    )
+    post = to_post(message, {SMILE_ID: "😀"})
+    assert (post.reactions, post.stars) == ({"😀": 2}, 3)
+
+
+def custom_emoji_document(id: int, alt: str) -> tg.Document:
+    attribute = tg.DocumentAttributeCustomEmoji(alt=alt, stickerset=tg.InputStickerSetEmpty())
+    return tg.Document(
+        id=id,
+        access_hash=0,
+        file_reference=b"",
+        date=DATE,
+        mime_type="image/webp",
+        size=1,
+        dc_id=1,
+        attributes=[attribute],
+    )
+
+
+class FakeUser:
+    def __init__(self, alts: dict[int, str]):
+        self.alts = alts
+        self.asked: list[list[int]] = []
+
+    async def __call__(self, request: functions.messages.GetCustomEmojiDocumentsRequest) -> list[tg.Document]:
+        self.asked.append(request.document_id)
+        return [custom_emoji_document(id, self.alts[id]) for id in request.document_id if id in self.alts]
+
+
+def test_resolve_custom_emoji_asks_only_about_new_ones() -> None:
+    user = FakeUser({SMILE_ID: "😀", HEART_ID: "❤️"})
+    known = {SMILE_ID: "😀"}
+    resolved = asyncio.run(resolve_custom_emoji(cast(TelegramClient, user), [SMILE_ID, HEART_ID], known))
+    assert resolved == {SMILE_ID: "😀", HEART_ID: "❤️"}
+    assert user.asked == [[HEART_ID]]
+    asyncio.run(resolve_custom_emoji(cast(TelegramClient, user), [SMILE_ID, HEART_ID], known))
+    assert user.asked == [[HEART_ID]]
+
+
+def test_custom_emoji_ids() -> None:
+    messages = [
+        tg.Message(
+            id=1,
+            peer_id=tg.PeerChannel(1),
+            date=DATE,
+            message="",
+            reactions=reactions((tg.ReactionCustomEmoji(SMILE_ID), 1)),
+        ),
+        tg.Message(
+            id=2, peer_id=tg.PeerChannel(1), date=DATE, message="", reactions=reactions((tg.ReactionEmoji("🔥"), 1))
+        ),
+        tg.Message(id=3, peer_id=tg.PeerChannel(1), date=DATE, message=""),
+    ]
+    assert custom_emoji_ids(messages) == {SMILE_ID}

@@ -53,8 +53,9 @@ class Post:
     grouped_id: int | None = None
     author: str | None = None
     reply_to: int | None = None
-    # Emoji reaction counts by emoticon; custom emoji and paid reactions are not counted
+    # Reaction counts by emoticon; custom emoji are counted as the emoji they stand for
     reactions: Mapping[str, int] = field(default_factory=dict)
+    stars: int = 0  # paid reactions
 
 
 @dataclass(frozen=True)

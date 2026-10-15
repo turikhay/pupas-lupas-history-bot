@@ -1,7 +1,8 @@
 import logging
+from collections.abc import Iterable, Mapping
 from datetime import date, timedelta, tzinfo
 
-from telethon import TelegramClient
+from telethon import TelegramClient, functions
 from telethon import types as tg
 
 from .captions import Caption
@@ -42,10 +43,46 @@ def media_kind(media: tg.TypeMessageMedia | None) -> MediaKind:
     return MediaKind.DOCUMENT
 
 
-def emoji_reactions(reactions: tg.MessageReactions | None) -> dict[str, int]:
-    if reactions is None:
-        return {}
-    return {r.reaction.emoticon: r.count for r in reactions.results if isinstance(r.reaction, tg.ReactionEmoji)}
+def emoji_reactions(reactions: tg.MessageReactions | None, custom_emoji: Mapping[int, str]) -> dict[str, int]:
+    """Reaction counts by emoticon; custom emoji count as the emoji they stand for (custom_emoji: id → emoji)."""
+    counts: dict[str, int] = {}
+    for r in reactions.results if reactions else ():
+        if isinstance(r.reaction, tg.ReactionEmoji):
+            emoticon = r.reaction.emoticon
+        elif isinstance(r.reaction, tg.ReactionCustomEmoji) and r.reaction.document_id in custom_emoji:
+            emoticon = custom_emoji[r.reaction.document_id]
+        else:
+            continue
+        # "❤️" and "❤" are the same reaction, with and without the emoji presentation selector
+        emoticon = emoticon.replace("\ufe0f", "")
+        counts[emoticon] = counts.get(emoticon, 0) + r.count
+    return counts
+
+
+def paid_stars(reactions: tg.MessageReactions | None) -> int:
+    return sum(r.count for r in reactions.results if isinstance(r.reaction, tg.ReactionPaid)) if reactions else 0
+
+
+def custom_emoji_ids(messages: Iterable[tg.Message]) -> set[int]:
+    return {
+        r.reaction.document_id
+        for message in messages
+        if message.reactions
+        for r in message.reactions.results
+        if isinstance(r.reaction, tg.ReactionCustomEmoji)
+    }
+
+
+async def resolve_custom_emoji(client: TelegramClient, ids: Iterable[int], known: dict[int, str]) -> dict[int, str]:
+    """Adds the emoji that the custom emoji stand for to known, asking Telegram only about the new ones."""
+    missing = [id for id in ids if id not in known]
+    if missing:
+        documents = await client(functions.messages.GetCustomEmojiDocumentsRequest(document_id=missing))
+        for document in documents:
+            for attribute in getattr(document, "attributes", ()):
+                if isinstance(attribute, tg.DocumentAttributeCustomEmoji):
+                    known[document.id] = attribute.alt
+    return known
 
 
 def to_entities(entities: list[tg.TypeMessageEntity] | None) -> tuple[Entity, ...]:
@@ -71,7 +108,7 @@ def to_telethon_entity(entity: Entity) -> tg.TypeMessageEntity:
     return _ENTITY_TYPES[entity.kind](entity.offset, entity.length)
 
 
-def to_post(message: tg.Message) -> Post:
+def to_post(message: tg.Message, custom_emoji: Mapping[int, str] | None = None) -> Post:
     assert message.date is not None
     return Post(
         id=message.id,
@@ -82,7 +119,8 @@ def to_post(message: tg.Message) -> Post:
         grouped_id=message.grouped_id,
         author=message.post_author,
         reply_to=message.reply_to.reply_to_msg_id if isinstance(message.reply_to, tg.MessageReplyHeader) else None,
-        reactions=emoji_reactions(message.reactions),
+        reactions=emoji_reactions(message.reactions, custom_emoji or {}),
+        stars=paid_stars(message.reactions),
     )
 
 
@@ -93,6 +131,8 @@ class ChannelHistory:
         self._user = user
         self._channel = channel
         self._tz = tz
+        # Custom emoji id → the emoji it stands for; a channel only allows a few, so they're asked about once
+        self._custom_emoji: dict[int, str] = {}
 
     @property
     def username(self) -> str | None:
@@ -108,7 +148,7 @@ class ChannelHistory:
         if not isinstance(anchor, list) or not anchor:
             logging.warning(f"get_messages returned empty list for {self._channel.id}")
             return []
-        posts: list[Post] = []
+        messages: list[tg.Message] = []
         async for message in self._user.iter_messages(self._channel, reverse=True, offset_id=anchor[0].id, limit=100):
             if not isinstance(message, tg.Message):
                 logging.info(f"Skipping {message.id}: it's not a message ({type(message).__name__})")
@@ -118,10 +158,11 @@ class ChannelHistory:
                 continue
             if message.date >= day_end:
                 break
-            posts.append(to_post(message))
-        if not posts:
+            messages.append(message)
+        if not messages:
             logging.warning(f"No posts found at the target date: {day}")
-        return posts
+        await resolve_custom_emoji(self._user, custom_emoji_ids(messages), self._custom_emoji)
+        return [to_post(message, self._custom_emoji) for message in messages]
 
 
 class BotPublisher:

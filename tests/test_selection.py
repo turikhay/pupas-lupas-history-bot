@@ -87,6 +87,15 @@ def test_score_counts_negative_emoticons_against() -> None:
     assert score(group(post(1, reactions={"🔥": 5, "👎": 2, "🤔": 1}))) == 2
 
 
+def test_each_star_is_worth_ten_reactions() -> None:
+    assert score(group(post(1, reactions={"🔥": 2, "👎": 1}, stars=3))) == 31
+
+
+def test_a_star_outweighs_a_few_reactions() -> None:
+    starred, liked = group(post(1, stars=1)), group(post(2, reactions={"🔥": 9}))
+    assert rank([liked, starred], random.Random(0)) == [starred, liked]
+
+
 def test_score_uses_the_first_album_item() -> None:
     assert score(group(post(1, grouped_id=9), post(2, grouped_id=9, reactions={"🔥": 5}))) == 0
 

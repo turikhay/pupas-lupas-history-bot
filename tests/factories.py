@@ -14,6 +14,7 @@ def post(
     author: str | None = None,
     reply_to: int | None = None,
     reactions: dict[str, int] | None = None,
+    stars: int = 0,
     date: datetime = DATE,
 ) -> Post:
     return Post(
@@ -26,6 +27,7 @@ def post(
         author=author,
         reply_to=reply_to,
         reactions=reactions or {},
+        stars=stars,
     )
 
 
